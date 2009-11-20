@@ -1,0 +1,10 @@
+*.pyc
+
+*.swp
+
+*.json
+*.csv
+*.txt
+
+bnc-xml/*
+

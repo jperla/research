@@ -1,18 +1,25 @@
 #!/usr/bin/python
 import simplejson
-import webify
-from webify.templates.helpers import html
+import weby
+from weby.templates.helpers import html
 
-app = webify.defaults.app()
+app = weby.defaults.App()
 
-@app.subapp('/defragment')
-@webify.urlable()
-def defragment(req, p):
+@app.subapp('frequencies')
+@weby.urlable_page()
+def defragment(req, page):
     query = req.params.get('query', '').strip('\r\n ').lower()
-    p(unicode(simplejson.dumps(indexed_fragments.get(query, ''))))
+    results = inverted_ranked_lemmas.get(query, [])
+    page(unicode(simplejson.dumps(results)))
+
+@app.subapp('defragment')
+@weby.urlable_page()
+def defragment(req, page):
+    query = req.params.get('query', '').strip('\r\n ').lower()
+    page(unicode(simplejson.dumps(indexed_fragments.get(query, u''))))
 
 #@app.subapp('/defragment')
-#@webify.urlable()
+#@weby.urlable()
 #def defragment(req, p):
 #    query = req.params.get('query', '').strip('\r\n ').lower()
 #    p(unicode(simplejson.dumps(indexed_fragments.get(query, ''))))
@@ -37,15 +44,14 @@ def index_fragments(r):
             fragments[f] = fragments.get(f, []) + [lemma]
     return fragments
 
-    
 ranked_lemmas = read_ranked_lemmas()
 inverted_ranked_lemmas = invert_ranked_lemmas(ranked_lemmas)
 indexed_fragments = index_fragments(inverted_ranked_lemmas)
 
-from webify.middleware import EvalException
-wrapped_app = webify.wsgify(app, EvalException)
+from weby.middleware import EvalException
+wrapped_app = weby.wsgify(app, EvalException)
 
 if __name__ == '__main__':
     print 'Loading server...'
-    webify.http.server.serve(wrapped_app, host='127.0.0.1', port=8090, reload=True)
+    weby.http.server.serve(wrapped_app, host='127.0.0.1', port=8090, reload=True)
 

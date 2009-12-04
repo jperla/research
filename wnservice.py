@@ -5,10 +5,10 @@ import nltk
 from nltk.corpus import wordnet as wn
 import simplejson
 
-import webify
-from webify.templates.helpers import html
+import weby
+from weby.templates.helpers import html
 
-app = webify.defaults.app()
+app = weby.defaults.App()
 
 def synset_from_word(w):
     w = w.strip('\r\n ').lower()
@@ -19,31 +19,31 @@ def synset_from_word(w):
         return synsets[0]
 
 def synset_service(attribute, call_attribute=True, extract_lemmas=True):
-    @webify.urlable()
-    def synset_attribute_service(req, p):
-        synset = synset_from_word(req.params.get('word', ''))
+    @weby.urlable_page()
+    def synset_attribute_service(req, page):
+        synset = synset_from_word(req.params.get('word', u''))
         if synset is not None:
             a = getattr(synset, attribute)
             if call_attribute:
                 a = a()
             if extract_lemmas:
                 a = [s.lemma_names[0] for s in a]
-            p(unicode(simplejson.dumps(a)))
+            page(unicode(simplejson.dumps(a)))
         else:
-            p(u'null')
+            page(unicode(simplejson.dumps(None)))
         
     return synset_attribute_service
     
 
 definition_view = synset_service('definition', False, False)
-app.subapp('/definition')(definition_view)
+definition_view = app.subapp('definition')(definition_view)
 
 examples_view = synset_service('examples', False, False)
-app.subapp('/examples')(definition_view)
+examples = app.subapp('examples')(examples_view)
 
-@app.subapp('/relations')
-@webify.urlable()
-def relations(req, p):
+@app.subapp('relations')
+@weby.urlable_page()
+def relations(req, page):
     relation_attributes = [
         'hypernyms', 'hyponyms',
         'part_meronyms', 'part_holonyms',
@@ -55,22 +55,23 @@ def relations(req, p):
     if synset is not None:
         for r in relation_attributes:
             relations[r] = [s.lemma_names[0] for s in getattr(synset, r)()]
-    p(unicode(simplejson.dumps(relations)))
+    page(unicode(simplejson.dumps(relations)))
 
-app.subapp('/hypernyms')(synset_service('hypernyms'))
-app.subapp('/hyponyms')(synset_service('hyponyms'))
-app.subapp('/part_meronyms')(synset_service('part_meronyms'))
-app.subapp('/part_holonyms')(synset_service('part_holonyms'))
-app.subapp('/member_meronyms')(synset_service('member_meronyms'))
-app.subapp('/member_holonyms')(synset_service('member_holonyms'))
-app.subapp('/substance_meronyms')(synset_service('substance_meronyms'))
-app.subapp('/substance_holonyms')(synset_service('substance_holonyms'))
+hypernyms = app.subapp('hypernyms')(synset_service('hypernyms'))
+hyponyms = app.subapp('hyponyms')(synset_service('hyponyms'))
+app.subapp('part_meronyms')(synset_service('part_meronyms'))
+app.subapp('part_holonyms')(synset_service('part_holonyms'))
+app.subapp('member_meronyms')(synset_service('member_meronyms'))
+app.subapp('member_holonyms')(synset_service('member_holonyms'))
+app.subapp('substance_meronyms')(synset_service('substance_meronyms'))
+app.subapp('substance_holonyms')(synset_service('substance_holonyms'))
 
 
-from webify.middleware import EvalException
-wrapped_app = webify.wsgify(app, EvalException)
+from weby.middleware import EvalException
+wrapped_app = weby.wsgify(app, EvalException)
 
 if __name__ == '__main__':
+    synsets = wn.synsets('word')
     print 'Loading server...'
-    webify.http.server.serve(wrapped_app, host='127.0.0.1', port=8092, reload=True)
+    weby.http.server.serve(wrapped_app, host='127.0.0.1', port=8092, reload=True)
 

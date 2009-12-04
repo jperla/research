@@ -16,13 +16,9 @@ def defragment(req, page):
 @weby.urlable_page()
 def defragment(req, page):
     query = req.params.get('query', '').strip('\r\n ').lower()
-    page(unicode(simplejson.dumps(indexed_fragments.get(query, u''))))
-
-#@app.subapp('/defragment')
-#@weby.urlable()
-#def defragment(req, p):
-#    query = req.params.get('query', '').strip('\r\n ').lower()
-#    p(unicode(simplejson.dumps(indexed_fragments.get(query, ''))))
+    fragments = indexed_fragments.get(query, [])
+    json = unicode(simplejson.dumps(fragments))
+    page(json)
 
 
 def read_ranked_lemmas(filename='ranked_lemmas_compressed.json'):

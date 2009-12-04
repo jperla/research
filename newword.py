@@ -29,7 +29,7 @@ def index(req, page):
 def web_service(url, argname, page, arg):
     # #TODO: jperla: security issue
     u = '%s%s?%s=%s' % (url, page, argname, arg)
-    a= simplejson.loads(urllib2.urlopen(u).read())
+    a = simplejson.loads(urllib2.urlopen(u).read())
     return a
 
 frequencies_ws = partial(web_service, 'http://127.0.0.1:8090/', 'query')

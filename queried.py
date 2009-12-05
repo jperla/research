@@ -49,5 +49,6 @@ wrapped_app = weby.wsgify(app, EvalException)
 
 if __name__ == '__main__':
     print 'Loading server...'
-    weby.http.server.serve(wrapped_app, host='127.0.0.1', port=8090, reload=True)
+    #weby.http.server.serve(wrapped_app, host='127.0.0.1', port=8090, reload=True)
+    weby.http.server.tornado.start(app, host='127.0.0.1', port=8090)
 

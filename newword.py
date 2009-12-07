@@ -1,5 +1,6 @@
 #!/usr/bin/python
 import math
+import urllib
 import urllib2
 from functools import partial
 
@@ -40,7 +41,7 @@ def ranked_synonyms(synset):
  
 def web_service(url, path, attrs):
     # #TODO: jperla: security issue; needs to be escaped
-    query_string = '&'.join('%s=%s' % (k,v) for k,v in attrs.iteritems())
+    query_string = '&'.join('%s=%s' % (urllib.quote(k),urllib.quote(v)) for k,v in attrs.iteritems())
     u = '%s%s?%s' % (url, path, query_string)
     a = simplejson.loads(urllib2.urlopen(u).read())
     return a
@@ -73,6 +74,7 @@ def lookup_query(query):
     return [normalize_frequency(s) for s in results]
 '''
 
+@weby.templates.sanitize_html()
 @weby.template()
 def template_index(p, query, results):
     with p(html.html()):
@@ -82,8 +84,8 @@ def template_index(p, query, results):
             p(html.h1('WordNet'))
             with p(html.form({'action':'', 'method':'GET'})):
                 p(html.input_text('query', query))
-                p(html.input_submit('Search'))
-            if results is not None:
+                p(html.input_submit(value='Search'))
+            if not results == None:
                 if results == []:
                     p(html.p('No synsets found'))
                 else:

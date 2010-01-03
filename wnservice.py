@@ -23,7 +23,7 @@ def synset_from_params(params):
         else:
             return synset
     query = params.get('query', u'').strip('\r\n ').lower()
-    synsets = wn.synsets(query)
+    synsets = wn.synsets(query.replace(' ', '_'))
     if synsets == []:
         return None
     else:
@@ -50,10 +50,20 @@ def synset_service(attribute, call_attribute=True, extract_lemmas=True):
 def synsets_service(req, page):
     query = req.params.get('query', None)
     if query is not None:
-        synsets = wn.synsets(query)
+        synsets = wn.synsets(query.replace(' ', '_'))
         page(unicode(simplejson.dumps([s.name for s in synsets])))
     else:
         page(unicode(simplejson.dumps(None)))
+
+@app.subapp('synset_pos_offset')
+@weby.urlable_page()
+def synset_pos_offst(req, page):
+    synset = synset_from_params(req.params)
+    if synset is not None:
+        page(unicode(simplejson.dumps(offset_str(synset))))
+    else:
+        page(unicode(simplejson.dumps(None)))
+
 
 synonyms_view = synset_service('lemma_names', False, False)
 synonyms_view = app.subapp('synonyms')(synonyms_view)
@@ -65,25 +75,51 @@ definition_view = app.subapp('definition')(definition_view)
 #images
 http://www.image-net.org/api/text/imagenet.synset.geturls?wnid=n02084071
 '''
+def link_word(w):
+    stopwords = set([
+                    'a', 'the', 'can', 'be', 'is', 'or', 'as',
+                    'in', 'an', 'has', 'by', 'it', 'its',
+                    ])
+    if w in stopwords:
+        return None
+    synsets = wn.synsets(w)
+    if len(synsets) == 0:
+        return None
+    else:
+        return synsets[0].lemma_names[0]
+
+def link_definition(synset):
+    linked = [(w, link_word(w)) for w in synset.definition.split(' ')]
+    return linked
 
 @app.subapp('linked_definition')
 @weby.urlable_page()
 def linked_definition(req, page):
     synset = synset_from_params(req.params)
-    def link_word(w):
-        stopwords = set([
-                        'a', 'the', 'can', 'be', 'is', 'or', 'as',
-                        'in', 'an', 'has', 'by', 'it', 'its',
-                        ])
-        if w in stopwords:
-            return None
-        synsets = wn.synsets(w)
-        if len(synsets) == 0:
-            return None
-        else:
-            return synsets[0].lemma_names[0]
     if synset is not None:
-        linked = [(w, link_word(w)) for w in synset.definition.split(' ')]
+        linked = link_definition(synset)
+        page(unicode(simplejson.dumps(linked)))
+    else:
+        page(unicode(simplejson.dumps(None)))
+
+@app.subapp('linked_gloss')
+@weby.urlable_page()
+def linked_gloss(req, page):
+    synset = synset_from_params(req.params)
+    def link_gloss(synset):
+        linked = linked_gloss(synset)
+        if linked is None:
+            return synset.definition
+        else:
+            sentence = []
+            for w,s in linked:
+                if s is None:
+                    sentence.append((w, None))
+                else:
+                    sentence.append((w, s.name))
+            return sentence
+    if synset is not None:
+        linked = link_gloss(synset)
         page(unicode(simplejson.dumps(linked)))
     else:
         page(unicode(simplejson.dumps(None)))
@@ -115,6 +151,52 @@ app.subapp('member_meronyms')(synset_service('member_meronyms'))
 app.subapp('member_holonyms')(synset_service('member_holonyms'))
 app.subapp('substance_meronyms')(synset_service('substance_meronyms'))
 app.subapp('substance_holonyms')(synset_service('substance_holonyms'))
+
+
+index_from_sense = simplejson.loads(open('index_from_sense.json', 'r').read())
+lemma_from_index = simplejson.loads(open('lemma_from_index.json', 'r').read())
+gloss_adv = simplejson.loads(open('gloss_adv.json', 'r').read())
+gloss_adj = simplejson.loads(open('gloss_adj.json', 'r').read())
+gloss_verb = simplejson.loads(open('gloss_verb.json', 'r').read())
+gloss_noun = simplejson.loads(open('gloss_noun.json', 'r').read())
+
+def synset_from_sense(sense):
+    i = index_from_sense.get(sense, None)
+    lemma = lemma_from_index.get(i, None)
+    if lemma is None:
+        return None
+    else:
+        synset = None
+        synsets = wn.synsets(lemma)
+        for s in synsets:
+            if s.offset == int(i):
+                synset = s
+        return synset
+
+def offset_str(synset):
+    offset_str = str(synset.offset)
+    offset_str = ((8 - len(offset_str)) * '0') + offset_str
+    return synset.pos + offset_str
+
+def linked_gloss(synset):
+    if synset.pos == wn.NOUN:
+        gloss = gloss_noun.get(offset_str(synset), None)
+    elif synset.pos == wn.VERB:
+        gloss = gloss_verb.get(offset_str(synset), None)
+    elif synset.pos == wn.ADJ:
+        gloss = gloss_adj.get(offset_str(synset), None)
+    elif synset.pos == wn.ADV:
+        gloss = gloss_adv.get(offset_str(synset), None)
+    else:
+        return None
+    if gloss is None:
+        return None
+    else:
+        gloss = [(lemma, synset_from_sense(sense)) for lemma,sense in gloss]
+        return gloss
+
+
+
 
 
 from weby.middleware import EvalException

@@ -66,6 +66,21 @@ def lookup_query(query):
     results = results[:4]
     return [normalize_frequency(s) for s in results]
 
+'''
+# Did substring lookup but that sucks
+def lookup_query(query):
+    #results = inverted_ranked_lemmas.get(query, [])
+    defragmented = frequencies_ws('defragment', {'query':query})
+    results = []
+    for d in defragmented:
+        results.extend(frequencies_ws('frequencies', {'query':d}))
+    results.extend(frequencies_ws('frequencies', {'query':query}))
+    results = list(reversed(sorted(results, key=lambda r:sum(count for _,count in r))))
+    results = results[:4]
+    return [normalize_frequency(s) for s in results]
+'''
+
+#@weby.templates.sanitize_html()
 @weby.template()
 def template_index(p, query, results):
     with p(html.html()):
@@ -75,8 +90,8 @@ def template_index(p, query, results):
             p(html.a(html.h1('WordNet'), {'href':'/', 'style':'text-decoration:none;color:black;'}))
             with p(html.form({'action':'', 'method':'GET'})):
                 p(html.input_text('query', query))
-                p(html.input_submit('Search'))
-            if results is not None:
+                p(html.input_submit(value='Search'))
+            if not results == None:
                 if results == []:
                     p(html.p('No synsets found'))
                 else:
@@ -90,7 +105,7 @@ def partial_definition(p, definition):
             if s is None:
                 p(html.h(w))
             else:
-                p(html.ahref(index.url() + '?synset=' + s, w))
+                p(html.a_href(index.url() + '?synset=' + s, w))
             p(u' ')
     except:
         p(definition)
@@ -139,7 +154,7 @@ def partial_result(p, result, synonyms, definition, relations, images):
             if len(words) > 0: 
                 with p(html.li()):
                     p(html.b('%s: ' % relation))
-                    q=['%s' % html.ahref(index.url()+'?query='+w, w) for w in words]
+                    q=['%s' % html.a_href(index.url()+'?query='+w, w) for w in words]
                     p(', '.join(q))
    with p(html.td()):
         p(template_image_table(images))

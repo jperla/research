@@ -66,53 +66,45 @@ def lookup_query(query):
     results = results[:4]
     return [normalize_frequency(s) for s in results]
 
-'''
-# Did substring lookup but that sucks
-def lookup_query(query):
-    #results = inverted_ranked_lemmas.get(query, [])
-    defragmented = frequencies_ws('defragment', {'query':query})
-    results = []
-    for d in defragmented:
-        results.extend(frequencies_ws('frequencies', {'query':d}))
-    results.extend(frequencies_ws('frequencies', {'query':query}))
-    results = list(reversed(sorted(results, key=lambda r:sum(count for _,count in r))))
-    results = results[:4]
-    return [normalize_frequency(s) for s in results]
-'''
 
-#@weby.templates.sanitize_html()
+@weby.templates.sanitize_html()
 @weby.template()
 def template_index(p, query, results):
     with p(html.html()):
         with p(html.head()):
             p(html.title('%s - WordNet' % query))
         with p(html.body()):
-            p(html.a(html.h1('WordNet'), {'href':'/', 'style':'text-decoration:none;color:black;'}))
+            #p(html.a(html.h1('WordNet'), {'href':'/', 'style':'text-decoration:none;color:black;'}))
             with p(html.form({'action':'', 'method':'GET'})):
                 p(html.input_text('query', query))
-                p(html.input_submit(value='Search'))
+                p(html.input_submit(value='Search WordNet'))
             if not results == None:
                 if results == []:
                     p(html.p('No synsets found'))
                 else:
                     for result, synonyms, definition, relations, images in results:
-                        p(partial_result(result, synonyms, definition, relations, images))
+                        p(partial_result(query, result, synonyms, definition, relations, images))
+
+def link_to_synset(synset, word=None, type=''):
+    if word is None:
+        word = synset.split('.')[0].replace('_', ' ')
+    return html.a_href('%s?synset=%s' % (index.url(), synset), word, {'class':type})
                         
 @weby.template()
 def partial_definition(p, definition):
     try:
-        for w,s in definition:
+        for w,s in definition[:-1]:
             if s is None:
                 p(html.h(w))
             else:
-                p(html.a_href(index.url() + '?synset=' + s, w))
+                p(link_to_synset(s, w, 'gloss'))
             p(u' ')
     except:
         p(definition)
     
 @weby.template()
 def helper_linked_preview_image(p, image_url):
-    p(html.a(html.img('', {'src':image_url, 'style':'max-width:190px;max-height:190px;'}), {'href':image_url, 'style':'border:0'}))
+    p(html.a(html.img('', {'src':image_url, 'style':'max-width:150px;max-height:150px;'}), {'href':image_url, 'style':'border:0'}))
 
 @weby.template()
 def template_image_table(p, images):
@@ -132,32 +124,102 @@ def template_image_table(p, images):
                 if len(images) > 3:
                     p(helper_linked_preview_image(images[3]))
 
+def helper_synonym(query, lemma, count, max_count):
+    lemma = lemma.replace('_', ' ')
+    if query == lemma:
+        lemma = html.b(lemma)
+    if count > 0:
+        c = html.span('%s %s' % (lemma, helper_count_box(count, max_count)))
+    else:
+        c = html.span('%s' % lemma)
+    return c
+
+@weby.templates.joined()
+def helper_count_box(p, count, max_count):
+    if count > 0:
+        if max_count > 1:
+            num_boxes = round((math.log(count) / math.log(max_count)) * 4)
+        else:
+            num_boxes = 4
+    else:
+        num_boxes = 0
+    if num_boxes > 0:
+        style = 'height:6px;width:6px;border:1px solid white;background-color:blue;position:absolute;'
+        with p(html.div({'style':'display:inline;position:absolute;'})):
+            if num_boxes >= 4:
+                p(html.div(' ', {'style':'top:1px;left:6px;' + style}))
+            if num_boxes >= 3:
+                p(html.div(' ', {'style':'top:1px;left:-1px;' + style}))
+            if num_boxes >= 2:
+                p(html.div(' ', {'style':'top:8px;left:6px;' + style}))
+            if num_boxes >= 1:
+                p(html.div(' ', {'style':'top:8px;left:-1px;' + style}))
+        p(html.nobreaks('   '))
+
+def old_helper_synonym(query, lemma, count):
+    lemma = lemma.replace('_', ' ')
+    if query == lemma:
+        lemma = html.b(lemma)
+    if count > 0:
+        c = html.span('%s (%s)' % (lemma, count))
+    else:
+        c = html.span('%s' % lemma)
+    return c
+
 @weby.template()
-def partial_result(p, result, synonyms, definition, relations, images):
- with p(html.table()):
-  with p(html.tr()):
-   with p(html.td()):
-    with p(html.div({'style':'padding-left:20px;width:650px;'})):
-        p(html.b(u'%s: ' % result.split('.')[0]))
-        p(partial_definition(definition))
-        with p(html.ul({'style':'padding-top:0px;padding-bottom:0px;'})):
-            with p(html.li()):
-                s = [html.span('%s (%s)' % (lemma,count)) for lemma,count in synonyms]
+def partial_result(p, query, result, synonyms, definition, relations, images):
+    with p(html.table({'style':'margin:20px;width:100%;'})):
+        with p(html.tr()):
+            with p(html.td({'valign':'top', 'width':'50%'})):
+                p(partial_result_data(query, result, synonyms, definition, relations))
+                p(html.nobreaks(' '))
+            with p(html.td({'valign':'top', 'width':'50%'})):
+                p(template_image_table(images))
+                p(html.nobreaks(' '))
+
+@weby.template()
+def partial_result_data(p, query, result, synonyms, definition, relations):
+    with p(html.table()):
+        with p(html.tr()):
+            with p(html.td()):
+                max_count = max(c for _,c in synonyms)
+                s = [helper_synonym(query, l, c, max_count) for l,c in synonyms]
                 p(', '.join(s))
-                '''
-                with p(html.tr()):
-                    bar = {'style':'color:blue;height:1px;width:%spx;' % int(count*100)}
-                    if int(count*100) > 2:
-                        p(html.td('<div style="border:1px solid blue;color:blue;height:0px;width:%spx;">&nbsp;</div>' % int(count*100)))
-                '''
-        for relation,words in relations.iteritems():
-            if len(words) > 0: 
-                with p(html.li()):
-                    p(html.b('%s: ' % relation))
-                    q=['%s' % html.a_href(index.url()+'?query='+w, w) for w in words]
-                    p(', '.join(q))
-   with p(html.td()):
-        p(template_image_table(images))
+        with p(html.tr()):
+            with p(html.td()):
+                p(partial_definition(definition))
+        with p(html.tr()):
+            with p(html.td()):
+                p(partial_relations(relations))
+
+@weby.template()
+def partial_relations(p, relations):
+    larger = []
+    smaller = []
+    for relation,words in relations.iteritems():
+        if 'part' in relation:
+            type = 'part'
+        elif 'substance' in relation:
+            type = 'substance'
+        elif 'member' in relation:
+            type = 'member'
+        else:
+            type = 'kind'
+        if 'hyper' in relation or 'holo' in relation:
+            type += '-larger'
+            larger.extend([(w, type) for w in words])
+        else:
+            type += '-smaller'
+            smaller.extend([(w, type) for w in words])
+    if len(larger) > 0 or len(smaller) > 0:
+        with p(html.table()):
+            with p(html.tr()):
+                with p(html.td({'width':'50%', 'valign':'top'})):
+                    q=[link_to_synset(s, type=t) for s,t in smaller]
+                    p(u', '.join(q))
+                with p(html.td({'width':'50%', 'valign':'top'})):
+                    q=[link_to_synset(s, type=t) for s,t in larger]
+                    p(u', '.join(q))
 
 import pprint
 import sys

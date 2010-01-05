@@ -140,7 +140,7 @@ def relations(req, page):
     relations = {}
     if synset is not None:
         for r in relation_attributes:
-            relations[r] = [s.lemma_names[0] for s in getattr(synset, r)()]
+            relations[r] = [s.name for s in getattr(synset, r)()]
     page(unicode(simplejson.dumps(relations)))
 
 hypernyms = app.subapp('hypernyms')(synset_service('hypernyms'))
